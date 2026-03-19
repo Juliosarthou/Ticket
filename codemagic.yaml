@@ -1,0 +1,33 @@
+workflows:
+  default-workflow:
+    name: Build Ticket App
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      groups:
+        - shorebird_token # Create this group in Codemagic UI and add SHOREBIRD_TOKEN
+    scripts:
+      - name: Get Flutter dependencies
+        script: flutter pub get
+      - name: Build Android APK
+        script: flutter build apk --release
+      - name: Build iOS IPA
+        script: |
+          # The following script works only if you have set up code signing in Codemagic
+          flutter build ipa --release --no-codesign
+      - name: Shorebird Release (Optional)
+        script: |
+          # To use Shorebird in CI, you need to set SHOREBIRD_TOKEN in environment variables.
+          # Uncomment the lines below once you have the token.
+          # shorebird login:ci $SHOREBIRD_TOKEN
+          # shorebird release android
+          # shorebird release ios
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      - build/ios/ipa/*.app
+      - build/ios/ipa/*.ipa
+    publishing:
+      email:
+        recipients:
+          - sarthou@gmail.com # Based on git config
