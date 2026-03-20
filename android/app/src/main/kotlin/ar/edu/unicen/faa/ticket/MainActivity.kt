@@ -1,4 +1,4 @@
-package ar.edu.unicen.faa.ticket
+package ar.edu.unicen.edu.ar.faa.ticket
 
 import io.flutter.embedding.android.FlutterActivity
 

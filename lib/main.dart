@@ -2,8 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:http/http.dart' as http;
 
-void main() => runApp(const TicketApp());
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Manejo de notificaciones en 2do plano
+  await Firebase.initializeApp();
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint("Firebase ya estaba inicializado o falló: $e");
+  }
+  runApp(const TicketApp());
+}
 
 class TicketApp extends StatelessWidget {
   const TicketApp({super.key});
@@ -51,6 +69,7 @@ class _WebViewPageState extends State<WebViewPage> {
 
   Future<void> _inicializarApp() async {
     await _obtenerOgenerarIdPersistente();
+    _configurarNotificaciones(); // Iniciar configuración de notificaciones push
     
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -83,13 +102,72 @@ class _WebViewPageState extends State<WebViewPage> {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     // Usamos la misma clave si queremos compartir el ID entre apps del mismo usuario, 
     // pero aquí usaremos una propia para Ticket.
-    String? idGuardado = prefs.getString('mi_id_unico_sasma');
+    String? idGuardado = prefs.getString('mi_id_unico_ticket');
     if (idGuardado == null) {
       var uuid = const Uuid();
       idGuardado = uuid.v4();
-      await prefs.setString('mi_id_unico_sasma', idGuardado);
+      await prefs.setString('mi_id_unico_ticket', idGuardado);
     }
     imei = idGuardado;
+  }
+
+  // --- LÓGICA DE NOTIFICACIONES PUSH ---
+  Future<void> _configurarNotificaciones() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+      // Pedir permisos (necesario en iOS y Android 13+)
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized || 
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        
+        // Obtener el Token del dispositivo
+        String? fcmToken = await messaging.getToken();
+        if (fcmToken != null) {
+          debugPrint("FCM Token obtenido: $fcmToken");
+          await _enviarTokenAlServidor(fcmToken);
+        }
+
+        // Configurar para mostrar la notificación mientras la app está en primer plano
+        await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+    } catch (e) {
+      debugPrint("Error al configurar notificaciones: $e");
+    }
+  }
+
+  Future<void> _enviarTokenAlServidor(String fcmToken) async {
+    try {
+      final url = Uri.parse('https://sau.faa.unicen.edu.ar/app/g_token.php');
+      final response = await http.post(
+        url,
+        body: {
+          'imei': imei,
+          'token': fcmToken,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint("Respuesta servidor g_token: ${response.body}");
+      } else {
+        debugPrint("Error al enviar token al servidor. Status: ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("Excepción al enviar token: $e");
+    }
   }
 
   @override

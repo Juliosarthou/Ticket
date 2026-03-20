@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1048187502879",
+    "project_id": "ticket-9fc67",
+    "storage_bucket": "ticket-9fc67.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1048187502879:android:7ed6bfc3f5e93cb7cab02a",
+        "android_client_info": {
+          "package_name": "ar.edu.unicen.edu.ar.faa.ticket"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxFdJvpQO_iMP10MyL_h0m0mdm9x_UPIo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
