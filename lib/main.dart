@@ -118,14 +118,8 @@ class _WebViewPageState extends State<WebViewPage> {
     try {
       FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-      // En iOS es importante asegurarse de que el token APNS esté listo (necesario para Push)
-      if (Platform.isIOS) {
-        String? apnsToken = await messaging.getAPNSToken();
-        debugPrint("APNS Token obtenido: $apnsToken");
-      }
-
-
-      // Pedir permisos (necesario en iOS y Android 13+)
+      // Pedir permisos (necesario en iOS y Android 13+) 
+      // Se hace al principio para asegurar que el usuario puede ver la solicitud
       NotificationSettings settings = await messaging.requestPermission(
         alert: true,
         announcement: false,
@@ -141,6 +135,26 @@ class _WebViewPageState extends State<WebViewPage> {
       if (settings.authorizationStatus == AuthorizationStatus.authorized || 
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
+        // En iOS, es CRÍTICO que el token APNS esté listo antes de pedir el token FCM
+        // Si no, las notificaciones no llegarán.
+        if (Platform.isIOS) {
+          String? apnsToken;
+          int reintentos = 0;
+          while (apnsToken == null && reintentos < 5) {
+            apnsToken = await messaging.getAPNSToken();
+            if (apnsToken == null) {
+              debugPrint("Esperando token APNS... (reintento $reintentos)");
+              await Future.delayed(const Duration(seconds: 2));
+              reintentos++;
+            }
+          }
+          if (apnsToken == null) {
+            debugPrint("Error: No se pudo obtener el token APNS después de varios intentos. Es probable que no lleguen notificaciones.");
+          } else {
+            debugPrint("Token APNS obtenido exitosamente: $apnsToken");
+          }
+        }
+
         // Obtener el Token del dispositivo (FCM)
         String? fcmToken = await messaging.getToken();
         if (fcmToken != null) {
@@ -148,15 +162,26 @@ class _WebViewPageState extends State<WebViewPage> {
           await _enviarTokenAlServidor(fcmToken);
         }
 
+        // Listener por si el token cambia mientras la app está abierta
+        messaging.onTokenRefresh.listen((newToken) async {
+          debugPrint("FCM Token renovado: $newToken");
+          await _enviarTokenAlServidor(newToken);
+        });
+
         // Configurar para mostrar la notificación mientras la app está en primer plano
         await messaging.setForegroundNotificationPresentationOptions(
           alert: true,
           badge: true,
           sound: true,
         );
+
+        // Listener para mensajes en primer plano
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+          debugPrint("Notificación recibida en primer plano: ${message.notification?.title}");
+        });
       }
     } catch (e) {
-      debugPrint("Error al configurar notificaciones: $e");
+      debugPrint("Error detallado al configurar notificaciones: $e");
     }
   }
 
