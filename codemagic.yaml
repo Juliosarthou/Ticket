@@ -16,13 +16,13 @@ workflows:
         script: |
           # The following script works only if you have set up code signing in Codemagic
           flutter build ipa --release --no-codesign
-      - name: Shorebird Release (Optional)
+      - name: Shorebird Release
         script: |
-          # To use Shorebird in CI, you need to set SHOREBIRD_TOKEN in environment variables.
-          # Uncomment the lines below once you have the token.
-          # shorebird login:ci $SHOREBIRD_TOKEN
-          # shorebird release android
-          # shorebird release ios
+          # Use the provided SHOREBIRD_TOKEN in Codemagic environment variables
+          shorebird login:ci $SHOREBIRD_TOKEN
+          shorebird release android --no-codesign
+          # shorebird release ios --no-codesign # Needs Mac, Codemagic m2 has it.
+
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
       - build/ios/ipa/*.app
