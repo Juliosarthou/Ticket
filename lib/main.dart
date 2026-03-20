@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
+import 'dart:io';
+
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -116,6 +118,13 @@ class _WebViewPageState extends State<WebViewPage> {
     try {
       FirebaseMessaging messaging = FirebaseMessaging.instance;
 
+      // En iOS es importante asegurarse de que el token APNS esté listo (necesario para Push)
+      if (Platform.isIOS) {
+        String? apnsToken = await messaging.getAPNSToken();
+        debugPrint("APNS Token obtenido: $apnsToken");
+      }
+
+
       // Pedir permisos (necesario en iOS y Android 13+)
       NotificationSettings settings = await messaging.requestPermission(
         alert: true,
@@ -127,10 +136,12 @@ class _WebViewPageState extends State<WebViewPage> {
         sound: true,
       );
 
+      debugPrint('Estado de autorización de notificaciones: ${settings.authorizationStatus}');
+
       if (settings.authorizationStatus == AuthorizationStatus.authorized || 
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
-        // Obtener el Token del dispositivo
+        // Obtener el Token del dispositivo (FCM)
         String? fcmToken = await messaging.getToken();
         if (fcmToken != null) {
           debugPrint("FCM Token obtenido: $fcmToken");
@@ -138,7 +149,7 @@ class _WebViewPageState extends State<WebViewPage> {
         }
 
         // Configurar para mostrar la notificación mientras la app está en primer plano
-        await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        await messaging.setForegroundNotificationPresentationOptions(
           alert: true,
           badge: true,
           sound: true,
@@ -148,6 +159,7 @@ class _WebViewPageState extends State<WebViewPage> {
       debugPrint("Error al configurar notificaciones: $e");
     }
   }
+
 
   Future<void> _enviarTokenAlServidor(String fcmToken) async {
     try {
